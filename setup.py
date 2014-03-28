@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 setup(
     name='gevent-bkyototycoon-mock',
     version='0.0.1',
-    description='kyototycoob(binary protocol) mock server based on gevent',
+    description='kyototycoon(binary protocol) mock server based on gevent',
     author='Studio Ousia',
     author_email='admin@ousia.jp',
     url='https://github.com/studio-ousia/gevent-bkyototycoon-mock',
