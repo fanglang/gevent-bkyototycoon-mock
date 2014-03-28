@@ -4,7 +4,7 @@ gevent-bkyototycoon-mock
 Basic Usage
 -----------
 
-In this sample we use `python-kyototycoon-binary <https://github.com/studio-ousia/python-kyototycoon-binary>` for client library
+In this sample we use `python-kyototycoon-binary <https://github.com/studio-ousia/python-kyototycoon-binary>`_ for client library
 
 .. code-block:: python
 
