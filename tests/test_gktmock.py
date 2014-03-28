@@ -8,7 +8,7 @@ import gevent.socket
 import gevent.monkey
 gevent.monkey.patch_all()
 
-from gktmock import KyotoTycoonMockServer
+from gktmock import KyotoTycoonMockServer, KTMockTimeOutError
 from bkyototycoon import KyotoTycoonConnection
 
 
@@ -156,17 +156,13 @@ class KyotoTycoonMockServerTestCase(TestCase):
         thread = gevent.spawn(_test_remove_bulk)
         thread.join()
 
-    @raises(StandardError)
+    @raises(KTMockTimeOutError)
     def test_timeout(self):
-        def _test_timeout():
-            server = KyotoTycoonMockServer()
-            server.start()
-            try:
-                server.wait(n=1, timeout_msec=100)
-            except Exception:
-                server.stop()
-                etype, value, traceback = sys.exc_info()
-                raise etype, value, traceback
-
-        thread = gevent.spanw(_test_timeout)
-        thread.join()
+        server = KyotoTycoonMockServer()
+        server.start()
+        try:
+            server.wait(n=1, timeout_msec=100)
+        except Exception:
+            server.stop()
+            etype, value, traceback = sys.exc_info()
+            raise etype, value, traceback
