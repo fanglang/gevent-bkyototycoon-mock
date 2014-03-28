@@ -17,4 +17,5 @@ In this sample we use `python-kyototycoon-binary <https://github.com/studio-ousi
     >>> client = KyotoTycoonConnection()
     >>> client.set_bulk({'a': 'value1'})
     >>> assert server.data == {'a': 'value1'}
+    >>> assert list(server.command_logs) == [dict(command='set_bulk', num_data=1, values={'a': 'value1'})]
 
