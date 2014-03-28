@@ -23,12 +23,31 @@ class KyotoTycoonMockServerTestCase(TestCase):
             
             client.set_bulk({'a': 'foo', 'b': 'bar'})
             eq_(server.data, {'a': 'foo', 'b': 'bar'})
+            eq_(
+                list(server.command_logs),
+                [dict(command='set_bulk', num_data=2, values={'a': 'foo', 'b': 'bar'})]
+            )
             
             client.set_bulk({'c': 'foobar'})
             eq_(server.data, {'a': 'foo', 'b': 'bar', 'c': 'foobar'})
+            eq_(
+                list(server.command_logs),
+                [
+                    dict(command='set_bulk', num_data=2, values={'a': 'foo', 'b': 'bar'}),
+                    dict(command='set_bulk', num_data=1, values={'c': 'foobar'}),
+                ]
+            )
             
             client.set_bulk({'a': 'FOO'})
             eq_(server.data, {'a': 'FOO', 'b': 'bar', 'c': 'foobar'})
+            eq_(
+                list(server.command_logs),
+                [
+                    dict(command='set_bulk', num_data=2, values={'a': 'foo', 'b': 'bar'}),
+                    dict(command='set_bulk', num_data=1, values={'c': 'foobar'}),
+                    dict(command='set_bulk', num_data=1, values={'a': 'FOO'}),
+                ]
+            )
             
             client.close()
             server.stop()
@@ -46,12 +65,31 @@ class KyotoTycoonMockServerTestCase(TestCase):
 
             r1 = client.get_bulk(['a', 'b'])
             eq_(r1, {'a': 'foo', 'b': 'bar'})
+            eq_(
+                list(server.command_logs),
+                [dict(command='get_bulk', num_keys=2, keys=['a', 'b'])]
+            )
 
             r2 = client.get_bulk(['c'])
             eq_(r2, {'c': 'foobar'})
+            eq_(
+                list(server.command_logs),
+                [
+                    dict(command='get_bulk', num_keys=2, keys=['a', 'b']),
+                    dict(command='get_bulk', num_keys=1, keys=['c'])
+                ]
+            )
 
             r3 = client.get_bulk(['d', 'e'])
             eq_(r3, {})
+            eq_(
+                list(server.command_logs),
+                [
+                    dict(command='get_bulk', num_keys=2, keys=['a', 'b']),
+                    dict(command='get_bulk', num_keys=1, keys=['c']),
+                    dict(command='get_bulk', num_keys=2, keys=['d', 'e'])
+                ]
+            )
 
             client.close()
             server.stop()
@@ -69,20 +107,48 @@ class KyotoTycoonMockServerTestCase(TestCase):
             r1 = client.remove_bulk(['a', 'b'])
             eq_(r1, 2)
             eq_(server.data, {'c': 'foobar'})
+            eq_(
+                list(server.command_logs),
+                [dict(command='remove_bulk', num_keys=2, keys=['a', 'b'])]
+            )
 
             r2 = client.remove_bulk(['xxx'])
             eq_(r2, 0)
             eq_(server.data, {'c': 'foobar'})
+            eq_(
+                list(server.command_logs),
+                [
+                    dict(command='remove_bulk', num_keys=2, keys=['a', 'b']),
+                    dict(command='remove_bulk', num_keys=1, keys=['xxx']),
+                ]
+            )
 
             r3 = client.remove_bulk(['c'])
             eq_(r3, 1)
             eq_(server.data, {})
+            eq_(
+                list(server.command_logs),
+                [
+                    dict(command='remove_bulk', num_keys=2, keys=['a', 'b']),
+                    dict(command='remove_bulk', num_keys=1, keys=['xxx']),
+                    dict(command='remove_bulk', num_keys=1, keys=['c']),
+                ]
+            )
 
             server.data = {'a': 'foo', 'b': 'bar', 'c': 'foobar'}
 
             r4 = client.remove_bulk(['a', 'x'])
             eq_(r4, 1)
             eq_(server.data, {'b': 'bar', 'c': 'foobar'})
+            eq_(
+                list(server.command_logs),
+                [
+                    dict(command='remove_bulk', num_keys=2, keys=['a', 'b']),
+                    dict(command='remove_bulk', num_keys=1, keys=['xxx']),
+                    dict(command='remove_bulk', num_keys=1, keys=['c']),
+                    dict(command='remove_bulk', num_keys=2, keys=['a', 'x']),
+                ]
+            )
 
             client.close()
             server.stop()
