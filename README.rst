@@ -1,6 +1,16 @@
 gevent-bkyototycoon-mock
 ========================
 
+Installation
+------------
+
+
+.. code-block:: bash
+
+    $ pip install gevent-bkyototycoon-mock
+
+
+
 Basic Usage
 -----------
 
