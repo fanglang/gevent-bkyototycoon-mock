@@ -52,10 +52,7 @@ class KyotoTycoonMockServer(object):
 
                 # log command
                 self.command_logs.append(dict(
-                    command='set_bulk',
-                    num_data=num_data,
-                    values=data_to_set
-                ))
+                    command='set_bulk', num_data=num_data, values=data_to_set))
 
                 # reply
                 if flag != FLAG_NOREPLY:
@@ -72,6 +69,9 @@ class KyotoTycoonMockServer(object):
                     zero, key_len = struct.unpack('!HI', k_header)
                     key = self.sock.recv(key_len)
                     keys.append(key)
+
+                self.command_logs.append(dict(
+                    command='get_bulk', num_keys=num_keys, keys=keys))
 
                 found_keys = [k for k in keys if k in self.data]
 
@@ -94,6 +94,9 @@ class KyotoTycoonMockServer(object):
                     zero, key_len = struct.unpack('!HI', k_header)
                     key = self.sock.recv(key_len)
                     keys.append(key)
+
+                self.command_logs.append(dict(
+                    command='remove_bulk', num_keys=num_keys, keys=keys))
 
                 found_keys = [k for k in keys if k in self.data]
                 for k in found_keys:
