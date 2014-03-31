@@ -11,13 +11,17 @@ MB_GET_BULK = 0xba
 MB_REMOVE_BULK = 0xb9
 FLAG_NOREPLY = 0x01
 
+DEFAULT_DB = 0
+
 class KTMockTimeOutError(Exception):
     pass
 
 class KyotoTycoonMockServer(object):
 
     def __init__(self):
-        self.data = {}
+        self.data = {
+            DEFAULT_DB: {}
+        }
         self.command_logs = deque([])
         self.stream_server = None
 
@@ -39,16 +43,19 @@ class KyotoTycoonMockServer(object):
 
                 # receive pairs
                 data_to_set = {}
+                db = DEFAULT_DB
                 for i in range(num_data):
                     # !HIIq => 2 + 4 + 4 + 8
                     kv_header = self._read(2+4+4+8)
-                    zero, key_len, val_len, lifetime = struct.unpack('!HIIq', kv_header)
+                    db, key_len, val_len, lifetime = struct.unpack('!HIIq', kv_header)
                     key = self.sock.recv(key_len)
                     val = self.sock.recv(val_len)
                     data_to_set[key] = val
 
                 # update cache memory
-                self.data.update(data_to_set)
+                if not self.data.get(db, None):
+                    self.data[db] = {}
+                self.data[db].update(data_to_set)
 
                 # log command
                 self.command_logs.append(dict(
@@ -64,21 +71,22 @@ class KyotoTycoonMockServer(object):
                 zero, num_keys = struct.unpack('!II', self._read(4+4))
 
                 keys = []
+                db = DEFAULT_DB
                 for i in range(num_keys):
                     k_header = self._read(2+4)
-                    zero, key_len = struct.unpack('!HI', k_header)
+                    db, key_len = struct.unpack('!HI', k_header)
                     key = self.sock.recv(key_len)
                     keys.append(key)
 
                 self.command_logs.append(dict(
                     command='get_bulk', num_keys=num_keys, keys=keys))
 
-                found_keys = [k for k in keys if k in self.data]
+                found_keys = [k for k in keys if k in self.data.get(db, {})]
 
                 # reply
                 self.sock.send(struct.pack('!BI', MB_GET_BULK, len(found_keys)))
                 for key in found_keys:
-                    value = self.data[key]
+                    value = self.data.get(db, {})[key]
                     kv_data = struct.pack('!HIIq', 0, len(key), len(value), 0)
                     self.sock.send(kv_data)
                     self.sock.send(key)
@@ -89,18 +97,19 @@ class KyotoTycoonMockServer(object):
                 flag, num_keys = struct.unpack('!II', self._read(4+4))
 
                 keys = []
+                db = DEFAULT_DB
                 for i in range(num_keys):
                     k_header = self._read(2+4)
-                    zero, key_len = struct.unpack('!HI', k_header)
+                    db, key_len = struct.unpack('!HI', k_header)
                     key = self.sock.recv(key_len)
                     keys.append(key)
 
                 self.command_logs.append(dict(
                     command='remove_bulk', num_keys=num_keys, keys=keys))
 
-                found_keys = [k for k in keys if k in self.data]
+                found_keys = [k for k in keys if k in self.data.get(db, {})]
                 for k in found_keys:
-                    del self.data[k]
+                    del self.data.get(db, {})[k]
 
                 # reply
                 if flag != FLAG_NOREPLY:
@@ -123,11 +132,11 @@ class KyotoTycoonMockServer(object):
         self.data = {}
         self.command_logs = deque([])
 
-    def wait(self, n, timeout_msec=0):
+    def wait(self, n, db=DEFAULT_DB, timeout_msec=0):
         """wait until log data queue named with 'tag' is filled with 'n' items"""
         time_msec_start = int(time.time() * 1000)
 
-        while len(self.data) < n:
+        while len(self.data.get(db, {})) < n:
             gevent.sleep()
             if 0 < timeout_msec and time_msec_start + timeout_msec < int(time.time() * 1000):
                 raise KTMockTimeOutError('wait(n=%d) timed out' % n)

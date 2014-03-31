@@ -8,7 +8,7 @@ import gevent.socket
 import gevent.monkey
 gevent.monkey.patch_all()
 
-from gktmock import KyotoTycoonMockServer, KTMockTimeOutError
+from gktmock import KyotoTycoonMockServer, KTMockTimeOutError, DEFAULT_DB
 from bkyototycoon import KyotoTycoonConnection
 
 
@@ -18,18 +18,18 @@ class KyotoTycoonMockServerTestCase(TestCase):
         def _test_set_bulk():
             server = KyotoTycoonMockServer()
             server.start()
-            eq_(server.data, {})
+            eq_(server.data[DEFAULT_DB], {})
             client = KyotoTycoonConnection(pack=False)
             
             client.set_bulk({'a': 'foo', 'b': 'bar'})
-            eq_(server.data, {'a': 'foo', 'b': 'bar'})
+            eq_(server.data[DEFAULT_DB], {'a': 'foo', 'b': 'bar'})
             eq_(
                 list(server.command_logs),
                 [dict(command='set_bulk', num_data=2, values={'a': 'foo', 'b': 'bar'})]
             )
             
             client.set_bulk({'c': 'foobar'})
-            eq_(server.data, {'a': 'foo', 'b': 'bar', 'c': 'foobar'})
+            eq_(server.data[DEFAULT_DB], {'a': 'foo', 'b': 'bar', 'c': 'foobar'})
             eq_(
                 list(server.command_logs),
                 [
@@ -39,7 +39,7 @@ class KyotoTycoonMockServerTestCase(TestCase):
             )
             
             client.set_bulk({'a': 'FOO'})
-            eq_(server.data, {'a': 'FOO', 'b': 'bar', 'c': 'foobar'})
+            eq_(server.data[DEFAULT_DB], {'a': 'FOO', 'b': 'bar', 'c': 'foobar'})
             eq_(
                 list(server.command_logs),
                 [
@@ -59,9 +59,9 @@ class KyotoTycoonMockServerTestCase(TestCase):
         def _test_get_bulk():
             server = KyotoTycoonMockServer()
             server.start()
-            eq_(server.data, {})
+            eq_(server.data[DEFAULT_DB], {})
             client = KyotoTycoonConnection(pack=False)
-            server.data = {'a': 'foo', 'b': 'bar', 'c': 'foobar'}
+            server.data[DEFAULT_DB] = {'a': 'foo', 'b': 'bar', 'c': 'foobar'}
 
             r1 = client.get_bulk(['a', 'b'])
             eq_(r1, {'a': 'foo', 'b': 'bar'})
@@ -102,11 +102,11 @@ class KyotoTycoonMockServerTestCase(TestCase):
             server = KyotoTycoonMockServer()
             server.start()
             client = KyotoTycoonConnection(pack=False)
-            server.data = {'a': 'foo', 'b': 'bar', 'c': 'foobar'}
+            server.data[DEFAULT_DB] = {'a': 'foo', 'b': 'bar', 'c': 'foobar'}
 
             r1 = client.remove_bulk(['a', 'b'])
             eq_(r1, 2)
-            eq_(server.data, {'c': 'foobar'})
+            eq_(server.data[DEFAULT_DB], {'c': 'foobar'})
             eq_(
                 list(server.command_logs),
                 [dict(command='remove_bulk', num_keys=2, keys=['a', 'b'])]
@@ -114,7 +114,7 @@ class KyotoTycoonMockServerTestCase(TestCase):
 
             r2 = client.remove_bulk(['xxx'])
             eq_(r2, 0)
-            eq_(server.data, {'c': 'foobar'})
+            eq_(server.data[DEFAULT_DB], {'c': 'foobar'})
             eq_(
                 list(server.command_logs),
                 [
@@ -125,7 +125,7 @@ class KyotoTycoonMockServerTestCase(TestCase):
 
             r3 = client.remove_bulk(['c'])
             eq_(r3, 1)
-            eq_(server.data, {})
+            eq_(server.data[DEFAULT_DB], {})
             eq_(
                 list(server.command_logs),
                 [
@@ -135,11 +135,11 @@ class KyotoTycoonMockServerTestCase(TestCase):
                 ]
             )
 
-            server.data = {'a': 'foo', 'b': 'bar', 'c': 'foobar'}
+            server.data[DEFAULT_DB] = {'a': 'foo', 'b': 'bar', 'c': 'foobar'}
 
             r4 = client.remove_bulk(['a', 'x'])
             eq_(r4, 1)
-            eq_(server.data, {'b': 'bar', 'c': 'foobar'})
+            eq_(server.data[DEFAULT_DB], {'b': 'bar', 'c': 'foobar'})
             eq_(
                 list(server.command_logs),
                 [
@@ -154,6 +154,34 @@ class KyotoTycoonMockServerTestCase(TestCase):
             server.stop()
 
         thread = gevent.spawn(_test_remove_bulk)
+        thread.join()
+
+    def test_multi_db(self):
+        def _test_multi_db():
+            server = KyotoTycoonMockServer()
+            server.start()
+            client = KyotoTycoonConnection(pack=False)
+
+            client.set_bulk({'a': 'foo1', 'b': 'bar1'}, db=1)
+            eq_(client.get_bulk(["a", "b"], db=1), {'a': 'foo1', 'b': 'bar1'})
+            eq_(client.get_bulk(["a", "b"], db=2), {})
+
+            client.set_bulk({'a': 'foo2', 'b': 'bar2'}, db=2)
+            eq_(client.get_bulk(["a", "b"], db=1), {'a': 'foo1', 'b': 'bar1'})
+            eq_(client.get_bulk(["a", "b"], db=2), {'a': 'foo2', 'b': 'bar2'})
+
+            client.remove_bulk(["a", "b"], db=1)
+            eq_(client.get_bulk(["a", "b"], db=1), {})
+            eq_(client.get_bulk(["a", "b"], db=2), {'a': 'foo2', 'b': 'bar2'})
+
+            client.remove_bulk(["a", "b"], db=2)
+            eq_(client.get_bulk(["a", "b"], db=1), {})
+            eq_(client.get_bulk(["a", "b"], db=2), {})
+
+            client.close()
+            server.stop()
+
+        thread = gevent.spawn(_test_multi_db)
         thread.join()
 
     @raises(KTMockTimeOutError)
